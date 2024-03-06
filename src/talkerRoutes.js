@@ -138,4 +138,25 @@ router.put('/:id', async (request, response) => {
     .json(updateResult.status === 200 ? updateResult.talker : updateResult.message);
 });
 
+router.delete('/:id', async (request, response) => {
+  const { authorization } = request.headers;
+  const { id } = request.params;
+  const tokenValidation = validateToken(authorization);
+  if (tokenValidation) return response.status(tokenValidation.status).json(tokenValidation.message);
+  try {
+    const data = await fs.readFile('./src/talker.json', 'utf8');
+    const talkers = JSON.parse(data);
+    const talkerIndex = talkers.findIndex((person) => person.id === parseInt(id, 10));
+    if (talkerIndex === -1) {
+      return response.status(404).json({ message: 'Pessoa palestrante não encontrada' });
+    }
+    talkers.splice(talkerIndex, 1);
+    await fs.writeFile('./src/talker.json', JSON.stringify(talkers));
+    return response.status(204).end();
+  } catch (error) {
+    return response.status(500)
+      .json({ message: `Erro ao deletar a pessoa palestrante: ${error.message}` });
+  }
+});
+
 module.exports = router;
