@@ -3,6 +3,8 @@ const fs = require('fs').promises;
 
 const router = express.Router();
 
+const TALKER_FILE_PATH = './src/talker.json';
+
 const validateToken = (token) => {
   if (!token) return { status: 401, message: { message: 'Token não encontrado' } };
   if (token.length !== 16) return { status: 401, message: { message: 'Token inválido' } };
@@ -61,7 +63,7 @@ const validateTalkerInfo = (name, age, talk) => {
 
 router.get('/', async (_request, response) => {
   try {
-    const data = await fs.readFile('./src/talker.json', 'utf8');
+    const data = await fs.readFile(TALKER_FILE_PATH, 'utf8');
     const talkerData = JSON.parse(data);
     response.status(200).json(talkerData);
   } catch (error) {
@@ -71,7 +73,7 @@ router.get('/', async (_request, response) => {
 
 router.get('/:id', async (request, response) => {
   try {
-    const data = await fs.readFile('./src/talker.json', 'utf8');
+    const data = await fs.readFile(TALKER_FILE_PATH, 'utf8');
     const talkerData = JSON.parse(data);
     const talker = talkerData.find((person) => person.id === parseInt(request.params.id, 10));
 
@@ -94,16 +96,46 @@ router.post('/', async (request, response) => {
   const infoValidation = validateTalkerInfo(name, age, talk);
   if (infoValidation) return response.status(infoValidation.status).json(infoValidation.message);
   try {
-    const data = await fs.readFile('./src/talker.json', 'utf8');
+    const data = await fs.readFile(TALKER_FILE_PATH, 'utf8');
     const talkers = JSON.parse(data);
     const newTalker = { id: talkers[talkers.length - 1].id + 1, name, age, talk };
     talkers.push(newTalker);
-    await fs.writeFile('./src/talker.json', JSON.stringify(talkers));
+    await fs.writeFile(TALKER_FILE_PATH, JSON.stringify(talkers));
     return response.status(201).json(newTalker);
   } catch (error) {
     return response.status(500)
       .json({ message: `Erro ao adicionar a pessoa palestrante: ${error.message}` });
   }
+});
+
+const updateTalker = async (id, name, age, talk) => {
+  const data = await fs.readFile(TALKER_FILE_PATH, 'utf8');
+  const talkers = JSON.parse(data);
+  const talkerIndex = talkers.findIndex((person) => person.id === parseInt(id, 10));
+
+  if (talkerIndex === -1) {
+    return { status: 404, message: { message: 'Pessoa palestrante não encontrada' } };
+  }
+
+  const updatedTalker = { id: parseInt(id, 10), name, age, talk };
+  talkers[talkerIndex] = updatedTalker;
+  await fs.writeFile(TALKER_FILE_PATH, JSON.stringify(talkers));
+  return { status: 200, talker: updatedTalker };
+};
+
+router.put('/:id', async (request, response) => {
+  const { authorization } = request.headers;
+  const { name, age, talk } = request.body;
+  const { id } = request.params;
+
+  const tokenValidation = validateToken(authorization);
+  if (tokenValidation) return response.status(tokenValidation.status).json(tokenValidation.message);
+  const infoValidation = validateTalkerInfo(name, age, talk);
+  if (infoValidation) return response.status(infoValidation.status).json(infoValidation.message);
+
+  const updateResult = await updateTalker(id, name, age, talk);
+  return response.status(updateResult.status)
+    .json(updateResult.status === 200 ? updateResult.talker : updateResult.message);
 });
 
 module.exports = router;
