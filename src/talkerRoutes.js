@@ -71,6 +71,27 @@ router.get('/', async (_request, response) => {
   }
 });
 
+router.get('/search', async (request, response) => {
+  const { authorization } = request.headers;
+  const { q: searchTerm } = request.query;
+  const tokenValidation = validateToken(authorization);
+  if (tokenValidation) return response.status(tokenValidation.status).json(tokenValidation.message);
+  try {
+    const data = await fs.readFile(TALKER_FILE_PATH, 'utf8');
+    const talkers = JSON.parse(data);
+
+    if (!searchTerm || searchTerm.trim() === '') {
+      return response.status(200).json(talkers);
+    }
+
+    const filteredTalkers = talkers.filter((talker) => talker.name.includes(searchTerm));
+
+    return response.status(200).json(filteredTalkers);
+  } catch (error) {
+    console.error(`Erro ao ler o arquivo 'talker.json': ${error.message}`);
+  }
+});
+
 router.get('/:id', async (request, response) => {
   try {
     const data = await fs.readFile(TALKER_FILE_PATH, 'utf8');
